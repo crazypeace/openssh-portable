@@ -2,60 +2,39 @@ name: Build OpenSSH Client
 
 on:
   push:
-    branches: [ master, main, '**' ]
+    branches: [ my-10.0p1-custom ]
   pull_request:
-    branches: [ master, main ]
-  workflow_dispatch:  # 允许手动触发
+    branches: [ my-10.0p1-custom ]
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: Build OpenSSH on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-            packages: "autoconf automake libtool make gcc zlib1g-dev libssl-dev"
-          - os: macos-latest
-            packages: "autoconf automake libtool openssl"
-
+  build-ubuntu:
+    name: Build on Ubuntu
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
-    - name: Install dependencies (Ubuntu)
-      if: matrix.os == 'ubuntu-latest'
+    - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y ${{ matrix.packages }}
+        sudo apt-get install -y autoconf automake libtool make gcc zlib1g-dev libssl-dev
 
-    - name: Install dependencies (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        brew update
-        brew install ${{ matrix.packages }}
-
-    - name: Configure
+    - name: Configure and Build
       run: |
         autoreconf -fi
-        ./configure --prefix=/tmp/openssh-install
-
-    - name: Build
-      run: |
+        ./configure
         make -j$(nproc)
 
-    - name: Test binaries exist
+    - name: Test binaries
       run: |
-        ls -la ssh ssh-keygen ssh-add ssh-agent ssh-keyscan || true
-        file ssh || true
+        ls -la ssh ssh-keygen ssh-add ssh-agent ssh-keyscan
+        ./ssh -V
 
-    - name: Upload SSH client binary
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ssh-client-${{ matrix.os }}
+        name: ssh-client-ubuntu
         path: |
           ssh
           ssh-keygen
@@ -64,13 +43,37 @@ jobs:
           ssh-keyscan
         retention-days: 30
 
-    - name: Install (optional)
-      run: |
-        make install
-        ls -la /tmp/openssh-install/bin/
+  build-macos:
+    name: Build on macOS
+    runs-on: macos-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    - name: Run basic tests
+    - name: Install dependencies
       run: |
+        brew update
+        brew install autoconf automake libtool openssl
+
+    - name: Configure and Build
+      run: |
+        autoreconf -fi
+        ./configure
+        make -j$(sysctl -n hw.ncpu)
+
+    - name: Test binaries
+      run: |
+        ls -la ssh ssh-keygen ssh-add ssh-agent ssh-keyscan
         ./ssh -V
-        ./ssh-keygen -V
-      continue-on-error: true
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ssh-client-macos
+        path: |
+          ssh
+          ssh-keygen
+          ssh-add
+          ssh-agent
+          ssh-keyscan
+        retention-days: 30
