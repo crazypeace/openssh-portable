@@ -1,0 +1,76 @@
+name: Build OpenSSH Client
+
+on:
+  push:
+    branches: [ master, main, '**' ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    name: Build OpenSSH on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            packages: "autoconf automake libtool make gcc zlib1g-dev libssl-dev"
+          - os: macos-latest
+            packages: "autoconf automake libtool openssl"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ${{ matrix.packages }}
+
+    - name: Install dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew update
+        brew install ${{ matrix.packages }}
+
+    - name: Configure
+      run: |
+        autoreconf -fi
+        ./configure --prefix=/tmp/openssh-install
+
+    - name: Build
+      run: |
+        make -j$(nproc)
+
+    - name: Test binaries exist
+      run: |
+        ls -la ssh ssh-keygen ssh-add ssh-agent ssh-keyscan || true
+        file ssh || true
+
+    - name: Upload SSH client binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: ssh-client-${{ matrix.os }}
+        path: |
+          ssh
+          ssh-keygen
+          ssh-add
+          ssh-agent
+          ssh-keyscan
+        retention-days: 30
+
+    - name: Install (optional)
+      run: |
+        make install
+        ls -la /tmp/openssh-install/bin/
+
+    - name: Run basic tests
+      run: |
+        ./ssh -V
+        ./ssh-keygen -V
+      continue-on-error: true

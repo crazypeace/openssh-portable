@@ -3,4 +3,4 @@
 #define SSH_VERSION	"OpenSSH_10.0"
 
 #define SSH_PORTABLE	"p2"
-#define SSH_RELEASE	SSH_VERSION SSH_PORTABLE
+#define SSH_RELEASE	SSH_VERSION SSH_PORTABLE " edited by ǝɔ∀ǝdʎz∀ɹɔ"
