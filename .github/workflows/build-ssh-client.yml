@@ -14,6 +14,8 @@ jobs:
   build:
     name: Build on Ubuntu
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -31,21 +33,19 @@ jobs:
         ls -la ssh
 
     - name: Create Release and Upload Asset
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ github.event.inputs.tag_name || format('build-{0}', github.run_number) }}
-        name: OpenSSH Client Build ${{ github.run_number }}
-        body: |
-          Automated build from `my-10.0p1-custom` branch
-          
-          **Changes:**
-          - Modified sshconnect2.c for login analysis
-          - Custom version string in version.h
-          - Added SSH_CLIENT_LOGIN_ANALYSIS.md
-          
-          **Binary:** ssh (Ubuntu x86_64)
-        files: ssh
-        draft: false
-        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        TAG_NAME="${{ github.event.inputs.tag_name || format('build-{0}', github.run_number) }}"
+        gh release create "$TAG_NAME" \
+          --repo "${{ github.repository }}" \
+          --title "OpenSSH Client Build ${{ github.run_number }}" \
+          --notes "**Automated build from \`my-10.0p1-custom\` branch**
+
+        **Changes:**
+        - Modified sshconnect2.c for login analysis
+        - Custom version string in version.h
+        - Added SSH_CLIENT_LOGIN_ANALYSIS.md
+
+        **Binary:** ssh (Ubuntu x86_64)" \
+          ssh
