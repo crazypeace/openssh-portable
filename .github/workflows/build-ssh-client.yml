@@ -4,6 +4,11 @@ on:
   push:
     branches: [ my-10.0p1-custom ]
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
 
 jobs:
   build:
@@ -25,9 +30,22 @@ jobs:
         make -j$(nproc)
         ls -la ssh
 
-    - name: Upload ssh
-      uses: actions/upload-artifact@v4
+    - name: Create Release and Upload Asset
+      uses: softprops/action-gh-release@v2
       with:
-        name: ssh-client-ubuntu
-        path: ssh
-        retention-days: 30
+        tag_name: ${{ github.event.inputs.tag_name || format('build-{0}', github.run_number) }}
+        name: OpenSSH Client Build ${{ github.run_number }}
+        body: |
+          Automated build from `my-10.0p1-custom` branch
+          
+          **Changes:**
+          - Modified sshconnect2.c for login analysis
+          - Custom version string in version.h
+          - Added SSH_CLIENT_LOGIN_ANALYSIS.md
+          
+          **Binary:** ssh (Ubuntu x86_64)
+        files: ssh
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
